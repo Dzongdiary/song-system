@@ -8,7 +8,7 @@
     :root {
       --bg-color: #f4f6f9;
       --btn-color: #8b5cf6;
-      --card-bg: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.85); /* 預設半透明白 */
     }
     body {
       font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
@@ -17,16 +17,24 @@
       transition: background 0.3s;
     }
     .container { max-width: 600px; margin: 0 auto; }
-    h1 { text-align: center; color: #333; }
+    h1 { text-align: center; color: #333; text-shadow: 0 2px 4px rgba(255,255,255,0.8); }
     
-    /* 搜尋與篩選欄 */
+    /* 搜尋與篩選欄（半透明毛玻璃效果） */
     .search-box {
       width: 100%; padding: 12px; margin-bottom: 15px;
-      border: 1px solid #ccc; border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.6); 
+      border-radius: 8px;
       font-size: 16px; box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.75); /* 半透明背景 */
+      backdrop-filter: blur(5px);
+      color: #1e293b;
+    }
+    .search-box:focus {
+      outline: none;
+      background: rgba(255, 255, 255, 0.9);
     }
     
-    /* 歌曲卡片樣式[cite: 1] */
+    /* 歌曲卡片樣式（半透明背景）[cite: 1] */
     .song-card {
       background: var(--card-bg);
       border-radius: 12px;
@@ -34,20 +42,22 @@
       margin-bottom: 12px;
       box-shadow: 0 4px 6px rgba(0,0,0,0.05);
       cursor: pointer;
-      transition: transform 0.2s;
+      transition: transform 0.2s, background 0.2s;
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
     }
-    .song-card:hover { transform: translateY(-2px); }
+    .song-card:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.95); }
     .song-title { font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 6px; }
-    .song-artist { font-size: 14px; color: #64748b; margin-bottom: 10px; }
+    .song-artist { font-size: 14px; color: #475569; margin-bottom: 10px; }
     
     /* 標籤樣式 */
     .tags { display: flex; gap: 6px; flex-wrap: wrap; }
     .tag {
-      background: #f1f5f9; color: #475569;
+      background: rgba(241, 245, 249, 0.8); color: #475569;
       padding: 4px 10px; border-radius: 12px;
       font-size: 12px;
     }
-    .tag.primary { background: #e0e7ff; color: #4338ca; }
+    .tag.primary { background: rgba(224, 231, 255, 0.8); color: #4338ca; }
     
     /* 彈出視窗 Modal */
     .modal-overlay {
@@ -56,8 +66,9 @@
       justify-content: center; align-items: center;
     }
     .modal {
-      background: white; padding: 24px; border-radius: 12px;
+      background: rgba(255, 255, 255, 0.95); padding: 24px; border-radius: 12px;
       width: 90%; max-width: 400px; text-align: center;
+      backdrop-filter: blur(10px);
     }
     .modal input {
       width: 100%; padding: 10px; margin: 15px 0;
@@ -94,7 +105,7 @@
 </div>
 
 <script>
-  const API_URL = "https://script.google.com/macros/s/AKfycbyVIrtlGkAf_Wp2jt7vyazQgSHYO9RL1__sJpAPULrIrGe_vAQWX8AL4GKUdpeumbsx/exec"; // 記得替換成你的最新 GAS 部署網址
+  const API_URL = "你的GAS網址"; // 記得替換成你的最新 GAS 部署網址
   let allSongs = [];
   let selectedSong = null;
 
@@ -113,17 +124,10 @@
         document.body.style.backgroundPosition = 'center';
       }
       
-      // 動態套用按鈕圖片
+      // 動態套用歌曲卡片背景圖片 (若有上傳)
       if(data.settings.btn_image) {
-        setTimeout(() => {
-          document.querySelectorAll('.btn').forEach(btn => {
-            if(!btn.classList.contains('btn-cancel')) {
-              btn.style.backgroundImage = `url(${data.settings.btn_image})`;
-              btn.style.backgroundSize = 'cover';
-              btn.style.backgroundPosition = 'center';
-            }
-          });
-        }, 100);
+        document.documentElement.style.setProperty('--card-bg', 'transparent');
+        window.cardImageStyle = `url(${data.settings.btn_image})`;
       }
       
       renderSongs(allSongs);
@@ -136,11 +140,11 @@
   function renderSongs(songs) {
     const container = document.getElementById('songList');
     if(songs.length === 0) {
-      container.innerHTML = '<p style="text-align:center;">沒有找到符合的歌曲</p>';
+      container.innerHTML = '<p style="text-align:center; color:#333; background:rgba(255,255,255,0.7); padding:10px; border-radius:8px;">沒有找到符合的歌曲</p>';
       return;
     }
     container.innerHTML = songs.map(song => `
-      <div class="song-card" onclick="openModal('${song.id}')">
+      <div class="song-card" onclick="openModal('${song.id}')" style="${window.cardImageStyle ? `background-image: ${window.cardImageStyle}; background-size: cover; background-position: center;` : ''}">
         <div class="song-title">🎵 ${song.title}</div>
         <div class="song-artist">🎤 ${song.artist}</div>
         <div class="tags">
