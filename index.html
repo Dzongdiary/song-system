@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>點歌系統 - 觀眾端</title>
+  <style>
+    :root {
+      --bg-color: #f4f6f9;
+      --btn-color: #8b5cf6;
+      --card-bg: #ffffff;
+    }
+    body {
+      font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      background-color: var(--bg-color);
+      margin: 0; padding: 20px;
+      transition: background 0.3s;
+    }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { text-align: center; color: #333; }
+    
+    /* 搜尋與篩選欄 */
+    .search-box {
+      width: 100%; padding: 12px; margin-bottom: 15px;
+      border: 1px solid #ccc; border-radius: 8px;
+      font-size: 16px; box-sizing: border-box;
+    }
+    
+    /* 歌曲卡片樣式[cite: 1] */
+    .song-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .song-card:hover { transform: translateY(-2px); }
+    .song-title { font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 6px; }
+    .song-artist { font-size: 14px; color: #64748b; margin-bottom: 10px; }
+    
+    /* 標籤樣式 */
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tag {
+      background: #f1f5f9; color: #475569;
+      padding: 4px 10px; border-radius: 12px;
+      font-size: 12px;
+    }
+    .tag.primary { background: #e0e7ff; color: #4338ca; }
+    
+    /* 彈出視窗 Modal */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); display: none;
+      justify-content: center; align-items: center;
+    }
+    .modal {
+      background: white; padding: 24px; border-radius: 12px;
+      width: 90%; max-width: 400px; text-align: center;
+    }
+    .modal input {
+      width: 100%; padding: 10px; margin: 15px 0;
+      border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box;
+    }
+    .btn {
+      background-color: var(--btn-color); color: white;
+      border: none; padding: 10px 20px; border-radius: 6px;
+      font-size: 16px; cursor: pointer; margin: 5px;
+    }
+    .btn-cancel { background-color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🎵 點歌清單</h1>
+  <input type="text" id="searchInput" class="search-box" placeholder="搜尋歌名、歌手、快慢歌、風格..." oninput="filterSongs()">
+  
+  <div id="songList">載入中...</div>
+</div>
+
+<!-- 點歌 Confirm Modal -->
+<div class="modal-overlay" id="orderModal">
+  <div class="modal">
+    <h3 id="modalSongTitle">點歌確認</h3>
+    <p>請輸入您的名字/暱稱：</p>
+    <input type="text" id="userNameInput" placeholder="例如：小明">
+    <div>
+      <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn" onclick="submitOrder()">確認點歌</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_URL = "https://script.google.com/macros/s/AKfycbyVIrtlGkAf_Wp2jt7vyazQgSHYO9RL1__sJpAPULrIrGe_vAQWX8AL4GKUdpeumbsx/exec"; // 記得替換成你的最新 GAS 部署網址
+  let allSongs = [];
+  let selectedSong = null;
+
+  // 初始化載入資料
+  async function loadData() {
+    try {
+      const res = await fetch(`${API_URL}?action=getData`);
+      const data = await res.json();
+      allSongs = data.songs;
+      
+      // 動態套用背景圖片
+      if(data.settings.bg_image) {
+        document.body.style.backgroundImage = `url(${data.settings.bg_image})`;
+        document.body.style.backgroundSize = 'cover';
+        document.body.style.backgroundAttachment = 'fixed';
+        document.body.style.backgroundPosition = 'center';
+      }
+      
+      // 動態套用按鈕圖片
+      if(data.settings.btn_image) {
+        setTimeout(() => {
+          document.querySelectorAll('.btn').forEach(btn => {
+            if(!btn.classList.contains('btn-cancel')) {
+              btn.style.backgroundImage = `url(${data.settings.btn_image})`;
+              btn.style.backgroundSize = 'cover';
+              btn.style.backgroundPosition = 'center';
+            }
+          });
+        }, 100);
+      }
+      
+      renderSongs(allSongs);
+    } catch(e) {
+      document.getElementById('songList').innerText = '載入失敗，請稍後重試。';
+    }
+  }
+
+  // 渲染歌曲列表[cite: 1]
+  function renderSongs(songs) {
+    const container = document.getElementById('songList');
+    if(songs.length === 0) {
+      container.innerHTML = '<p style="text-align:center;">沒有找到符合的歌曲</p>';
+      return;
+    }
+    container.innerHTML = songs.map(song => `
+      <div class="song-card" onclick="openModal('${song.id}')">
+        <div class="song-title">🎵 ${song.title}</div>
+        <div class="song-artist">🎤 ${song.artist}</div>
+        <div class="tags">
+          <span class="tag primary">熟練: ${'★'.repeat(Math.floor(song.proficiency))}${song.proficiency%1?'☆':''}</span>
+          <span class="tag">${song.language}</span>
+          <span class="tag">${song.tempo}</span>
+          <span class="tag">${song.style}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // 關鍵字搜尋
+  function filterSongs() {
+    const query = document.getElementById('searchInput').value.toLowerCase();
+    const filtered = allSongs.filter(s => 
+      s.title.toLowerCase().includes(query) ||
+      s.artist.toLowerCase().includes(query) ||
+      s.language.toLowerCase().includes(query) ||
+      s.tempo.toLowerCase().includes(query) ||
+      s.style.toLowerCase().includes(query)
+    );
+    renderSongs(filtered);
+  }
+
+  // 彈窗邏輯
+  function openModal(songId) {
+    selectedSong = allSongs.find(s => s.id === songId);
+    document.getElementById('modalSongTitle').innerText = `點歌：${selectedSong.title}`;
+    document.getElementById('orderModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('orderModal').style.display = 'none';
+    document.getElementById('userNameInput').value = '';
+  }
+
+  // 送出點歌
+  async function submitOrder() {
+    const userName = document.getElementById('userNameInput').value.trim();
+    if(!userName) return alert('請輸入您的名字！');
+
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerText = '傳送中...';
+
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({
+        action: 'addOrder',
+        userName: userName,
+        songTitle: selectedSong.title,
+        songArtist: selectedSong.artist
+      })
+    });
+
+    alert('點歌成功！主播會盡快為您演唱 🎤');
+    btn.disabled = false;
+    btn.innerText = '確認點歌';
+    closeModal();
+  }
+
+  loadData();
+</script>
+</body>
+</html>
